@@ -146,16 +146,16 @@ content and set of dependencies to other internal and external slices.
    :align: center
    :alt: A slice of Ubuntu
 
-This image depicts a simple case, where both packages *A* and *B* are
-deconstructed into multiple slices. At a package level, *B* depends on
-*A*, but in reality, there might be files in *A* that *B* doesn't
-actually need (eg. *A_slice3* isn't needed for *B* to function
-properly). With this slice definition in place, Chisel is able to
-extract a highly-customized and specialized Slice of the Ubuntu
-distribution, which one could see as a block of stone from which we can
-carve and extract small and relevant parts we need to run our
-applications. It is ideal to support the creation of smaller but equally
-functional container images.
+This image depicts a basic case, here's a bunch of text to increase the
+line, where both packages *A* and *B* are deconstructed into multiple
+slices. At a package level, *B* depends on *A*, but in reality, there
+might be files in *A* that *B* doesn't actually need (eg. *A_slice3*
+isn't needed for *B* to function properly). With this slice definition
+in place, Chisel is able to extract a highly-customized and specialized
+Slice of the Ubuntu distribution, which one could see as a block of
+stone from which we can carve and extract small and relevant parts we
+need to run our applications. It is ideal to support the creation of
+smaller but equally functional container images.
 
    *“The sculpture is already complete within the marble block, before I start my work. It is already there, I just have to chisel away the superfluous material.”*
       \- Michelangelo
