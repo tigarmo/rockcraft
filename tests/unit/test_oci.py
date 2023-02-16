@@ -289,6 +289,15 @@ class TestImage:
         (layer_dir / "second").mkdir()
         (layer_dir / "second/second.txt").touch()
 
+        (layer_dir / "second/subdir").mkdir()
+        (layer_dir / "second/subdir/subdir_file.txt").touch()
+
+        (layer_dir / "second/subdir/subsubdir").mkdir()
+        (layer_dir / "second/subdir/subsubdir/subsubdir_file.txt").touch()
+
+        (layer_dir / "third").mkdir()
+        (layer_dir / "third/third.txt").touch()
+
         image = oci.Image("a:b", dest_dir)
 
         # Create a dir tree to act as extracted "base"
@@ -300,6 +309,7 @@ class TestImage:
         os.symlink("first", rootfs_dir / "second")
 
         assert len(temp_tar_contents) == 0
+        print()
         image.add_layer("tag", layer_dir, base_layer_dir=rootfs_dir)
 
         # The tarfile must *not* contain the "./second" dir entry, to preserve
@@ -309,6 +319,12 @@ class TestImage:
             "first",
             "first/first.txt",
             "first/second.txt",
+            "first/subdir",
+            "first/subdir/subdir_file.txt",
+            "first/subdir/subsubdir",
+            "first/subdir/subsubdir/subsubdir_file.txt",
+            "third",
+            "third/third.txt",
         ]
         assert temp_tar_contents == expected_tar_contents
 

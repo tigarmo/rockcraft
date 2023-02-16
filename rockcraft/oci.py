@@ -355,7 +355,27 @@ def _archive_layer(
         base below this new layer. Used to preserve lower-level directory symlinks,
         like the ones from Debian/Ubuntu's usrmerge.
     """
+
+    @dataclass
+    class Ref:
+        upper_prefix: str = ""
+        lower_prefix: str = ""
+
+        def doit(self, p: Path) -> Path:
+            if not self.upper_prefix:
+                return p
+
+            str_p = str(p)
+            if str_p.startswith(self.upper_prefix):
+                return Path(str_p.replace(self.upper_prefix, self.lower_prefix, 1))
+            return p
+
+        def reset(self) -> None:
+            self.upper_prefix = ""
+            self.lower_prefix = ""
+
     with tarfile.open(temp_tar_file, mode="w") as tar_file:
+        symlink_ref = Ref()
         for dirpath, subdirs, filenames in os.walk(new_layer_dir):
             # Sort `subdirs` in-place, to ensure that `os.walk()` iterates on
             # them in sorted order.
@@ -365,6 +385,7 @@ def _archive_layer(
 
             # The path with `new_layer_dir` as the "root"
             relative_path = upper_subpath.relative_to(new_layer_dir)
+            print(f"dirpath: {relative_path}; subdirs: {subdirs}")
 
             # The name of the subdir that will contain the files added in this
             # iteration of the loop in the archive. Will be changed if
@@ -388,16 +409,22 @@ def _archive_layer(
                         f"Skipping {upper_subpath} because it exists as a symlink on the lower layer"
                     )
                     archive_subdir = cast(Path, lower_symlink_target)
+                    symlink_ref.upper_prefix = str(relative_path)
+                    symlink_ref.lower_prefix = str(archive_subdir)
+
                 else:
                     emit.debug(f"Adding to layer: {upper_subpath}")
+                    # if symlink_ref.upper_prefix in relative_path.parents:
+                    #     print("here")
+                    actual_path = symlink_ref.doit(relative_path)
                     tar_file.add(
-                        upper_subpath, arcname=f"{relative_path}", recursive=False
+                        upper_subpath, arcname=f"{actual_path}", recursive=False
                     )
 
             # Handle adding each file in the directory.
             for name in filenames:
                 actual_path = upper_subpath / name
-                archive_path = archive_subdir / name
+                archive_path = symlink_ref.doit(archive_subdir / name)
                 emit.debug(f"Adding to layer: {actual_path} as '{archive_path}'")
                 tar_file.add(actual_path, arcname=f"{archive_path}")
 
