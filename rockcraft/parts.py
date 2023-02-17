@@ -55,6 +55,7 @@ class PartsLifecycle:
         part_names: Optional[List[str]],
         base_layer_dir: pathlib.Path,
         base_layer_hash: bytes,
+        base: str,
     ):
         self._part_names = part_names
 
@@ -72,6 +73,7 @@ class PartsLifecycle:
                 base_layer_dir=base_layer_dir,
                 base_layer_hash=base_layer_hash,
                 ignore_local_sources=["*.rock"],
+                base=base,
             )
         except craft_parts.PartsError as err:
             raise PartsLifecycleError.from_parts_error(err) from err

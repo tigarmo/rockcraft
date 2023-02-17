@@ -102,6 +102,7 @@ def run(command_name: str, parsed_args: "argparse.Namespace") -> None:
             part_names=part_names,
             base_layer_dir=rootfs,
             base_layer_hash=base_digest,
+            base=project.base,
         )
 
         if command_name == "clean":

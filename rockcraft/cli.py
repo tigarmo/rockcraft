@@ -25,7 +25,7 @@ from craft_cli import ArgumentParsingError, EmitterMode, ProvideHelpException, e
 from craft_parts import PartsError
 from craft_providers import ProviderError
 
-from rockcraft import __version__, errors
+from rockcraft import __version__, errors, plugins
 
 from . import commands
 from .utils import get_managed_environment_log_path, is_managed_mode
@@ -90,6 +90,8 @@ def run() -> None:
         log_filepath=log_filepath,
     )
 
+    # Register our own plugins
+    plugins.register()
     dispatcher = craft_cli.Dispatcher(
         "rockcraft",
         COMMAND_GROUPS,
