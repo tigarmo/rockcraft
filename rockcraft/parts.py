@@ -24,6 +24,7 @@ import craft_parts
 from craft_archives import repo
 from craft_cli import emit
 from craft_parts import ActionType, Step
+from craft_parts import callbacks
 from xdg import BaseDirectory  # type: ignore
 
 from rockcraft.errors import PartsLifecycleError
@@ -128,6 +129,9 @@ class PartsLifecycle:
             if self._package_repositories:
                 emit.progress("Installing package repositories")
                 self._install_package_repositories()
+                callbacks.register_overlay_pkg(
+                    self._install_overlay_package_repositories
+                )
 
             emit.progress("Executing parts lifecycle")
 
@@ -155,20 +159,25 @@ class PartsLifecycle:
         except Exception as err:
             raise PartsLifecycleError(str(err)) from err
 
-    def _install_package_repositories(self) -> None:
+    def _install_package_repositories(self, root_dir=None) -> None:
         """Install package repositories in the environment."""
         if not self._package_repositories:
             emit.debug("No package repositories specified, none to install.")
             return
 
         refresh_required = repo.install(
-            self._package_repositories, key_assets=pathlib.Path("/dev/null")
+            self._package_repositories,
+            key_assets=pathlib.Path("/dev/null"),
+            root_dir=root_dir,
         )
-        if refresh_required:
+        if refresh_required and root_dir is None:
             emit.progress("Refreshing repositories")
             self._lcm.refresh_packages_list()
 
         emit.progress("Package repositories installed", permanent=True)
+
+    def _install_overlay_package_repositories(self, overlay_dir: pathlib.Path) -> None:
+        self._install_package_repositories(overlay_dir)
 
 
 def launch_shell(*, cwd: Optional[pathlib.Path] = None) -> None:
