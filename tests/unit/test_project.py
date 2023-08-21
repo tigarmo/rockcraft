@@ -28,7 +28,7 @@ import yaml
 
 from rockcraft.errors import ProjectLoadError, ProjectValidationError
 from rockcraft.pebble import Service
-from rockcraft.project import (
+from rockcraft.models.project import (
     INVALID_NAME_MESSAGE,
     ArchitectureMapping,
     Platform,

@@ -17,21 +17,70 @@
 
 """Rockcraft-specific code to interface with craft-providers."""
 
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
 from typing import Dict, Optional
 
+import craft_providers
+from craft_application import ProviderService
 from craft_cli import emit
 from craft_providers import Provider, ProviderError, bases, executor
 from craft_providers.lxd import LXDProvider
 from craft_providers.multipass import MultipassProvider
+from overrides import override
 
-from .utils import (
+from rockcraft.utils import (
     confirm_with_user,
     get_managed_environment_log_path,
     get_managed_environment_snap_channel,
 )
+
+
+class RockcraftProviderService(ProviderService):
+    managed_mode_env_var = "ROCKCRAFT_MANAGED_MODE"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # TODO add this to craft_application?
+        for env_key in ["http_proxy", "https_proxy", "no_proxy"]:
+            if env_key in os.environ:
+                self.environment[env_key] = os.environ[env_key]
+
+    @override
+    def get_base(
+        self,
+        base_name: bases.BaseName | tuple[str, str],
+        *,
+        instance_name: str,
+        **kwargs,
+    ) -> craft_providers.Base:
+        kwargs.setdefault("packages", []).extend(["gpg", "dirmngr"])
+        kwargs[
+            "compatibility_tag"
+        ] = f"rockcraft-{bases.BuilddBase.compatibility_tag}.0"
+        return super().get_base(
+            base_name=base_name, instance_name=instance_name, **kwargs
+        )
+
+    # return bases.BuilddBase(
+    #     alias=alias,
+    #     compatibility_tag=f"rockcraft-{bases.BuilddBase.compatibility_tag}.0",
+    #     environment=get_command_environment(),
+    #     hostname=instance_name,
+    #     snaps=[
+    #         bases.buildd.Snap(
+    #             name="rockcraft",
+    #             channel=snap_channel,
+    #             classic=True,
+    #         )
+    #     ],
+    #     packages=["gpg", "dirmngr"],
+    # )
+
 
 ROCKCRAFT_BASE_TO_PROVIDER_BASE = {
     "ubuntu:18.04": bases.BuilddBaseAlias.BIONIC,

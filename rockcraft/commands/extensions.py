@@ -28,7 +28,7 @@ from overrides import overrides
 from pydantic import BaseModel
 
 from rockcraft import extensions
-from rockcraft.project import Project, load_project
+from rockcraft.models.project import Project, load_project
 
 
 class ExtensionModel(BaseModel):

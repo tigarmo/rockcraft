@@ -23,7 +23,8 @@ import yaml
 from craft_cli import CraftError, ProvideHelpException, emit
 from craft_providers import ProviderError
 
-from rockcraft import cli, project
+from rockcraft import cli
+from rockcraft.models import project
 from rockcraft.errors import RockcraftError
 
 

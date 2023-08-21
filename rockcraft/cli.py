@@ -16,18 +16,26 @@
 
 """Command-line application entry point."""
 
+from __future__ import annotations
+
 import logging
 import sys
+from dataclasses import dataclass
 from typing import Optional
 
 import craft_cli
+from craft_application import ServiceFactory
 from craft_cli import ArgumentParsingError, EmitterMode, ProvideHelpException, emit
 from craft_parts import PartsError
 from craft_providers import ProviderError
 
-from rockcraft import __version__, errors, plugins
+from rockcraft import __version__, errors, plugins, application
 
 from . import commands
+from .services.lifecycle import RockcraftLifecycleService
+from .services.package import RockcraftPackageService
+from .services.platform import PlatformService, RockcraftPlatformService
+from .services.provider import RockcraftProviderService
 from .utils import get_managed_environment_log_path, is_managed_mode
 
 COMMAND_GROUPS = [
@@ -80,63 +88,83 @@ def _emit_error(error: craft_cli.CraftError, cause: Optional[Exception] = None) 
     emit.error(error)
 
 
+@dataclass
+class RockcraftServiceFactory(ServiceFactory):
+
+    PlatformClass: type[PlatformService] = RockcraftPlatformService
+
+
 def run() -> None:
-    """Run the CLI."""
-    # Register our own plugins
-    plugins.register()
-
-    # set lib loggers to debug level so that all messages are sent to Emitter
-    for lib_name in ("craft_providers", "craft_parts"):
-        logger = logging.getLogger(lib_name)
-        logger.setLevel(logging.DEBUG)
-
-    # Capture debug-level log output in a file in managed mode, even if rockcraft is
-    # executing with a lower log level
-    log_filepath = get_managed_environment_log_path() if is_managed_mode() else None
-
-    emit.init(
-        mode=EmitterMode.BRIEF,
-        appname="rockcraft",
-        greeting=f"Starting Rockcraft {__version__}",
-        log_filepath=log_filepath,
+    services = RockcraftServiceFactory(
+        app=application.APP_METADATA,
+        PackageClass=RockcraftPackageService,
+        ProviderClass=RockcraftProviderService,
+        PlatformClass=RockcraftPlatformService,
+        LifecycleClass=RockcraftLifecycleService,
     )
 
-    dispatcher = craft_cli.Dispatcher(
-        "rockcraft",
-        COMMAND_GROUPS,
-        summary="A tool to create OCI images",
-        extra_global_args=GLOBAL_ARGS,
-        default_command=commands.PackCommand,
-    )
+    app = application.Rockcraft(application.APP_METADATA, services)
 
-    try:
-        global_args = dispatcher.pre_parse_args(sys.argv[1:])
-        if global_args.get("version"):
-            emit.message(f"rockcraft {__version__}")
-        else:
-            dispatcher.load_command(None)
-            dispatcher.run()
-        emit.ended_ok()
-    except ProvideHelpException as err:
-        print(err, file=sys.stderr)  # to stderr, as argparse normally does
-        emit.ended_ok()
-    except ArgumentParsingError as err:
-        print(err, file=sys.stderr)  # to stderr, as argparse normally does
-        emit.ended_ok()
-        sys.exit(1)
-    except errors.RockcraftError as err:
-        _emit_error(err)
-        sys.exit(1)
-    except PartsError as err:
-        _emit_error(
-            craft_cli.CraftError(
-                err.brief, details=err.details, resolution=err.resolution
-            )
-        )
-        sys.exit(1)
-    except ProviderError as err:
-        _emit_error(craft_cli.CraftError(f"craft-providers error: {err}"))
-        sys.exit(1)
-    except Exception as err:  # pylint: disable=broad-except
-        _emit_error(craft_cli.CraftError(f"rockcraft internal error: {err!r}"))
-        sys.exit(1)
+    result = app.run()
+
+
+# def run() -> None:
+#     """Run the CLI."""
+#     # Register our own plugins
+#     plugins.register()
+#
+#     # set lib loggers to debug level so that all messages are sent to Emitter
+#     for lib_name in ("craft_providers", "craft_parts"):
+#         logger = logging.getLogger(lib_name)
+#         logger.setLevel(logging.DEBUG)
+#
+#     # Capture debug-level log output in a file in managed mode, even if rockcraft is
+#     # executing with a lower log level
+#     log_filepath = get_managed_environment_log_path() if is_managed_mode() else None
+#
+#     emit.init(
+#         mode=EmitterMode.BRIEF,
+#         appname="rockcraft",
+#         greeting=f"Starting Rockcraft {__version__}",
+#         log_filepath=log_filepath,
+#     )
+#
+#     dispatcher = craft_cli.Dispatcher(
+#         "rockcraft",
+#         COMMAND_GROUPS,
+#         summary="A tool to create OCI images",
+#         extra_global_args=GLOBAL_ARGS,
+#         default_command=commands.PackCommand,
+#     )
+#
+#     try:
+#         global_args = dispatcher.pre_parse_args(sys.argv[1:])
+#         if global_args.get("version"):
+#             emit.message(f"rockcraft {__version__}")
+#         else:
+#             dispatcher.load_command(None)
+#             dispatcher.run()
+#         emit.ended_ok()
+#     except ProvideHelpException as err:
+#         print(err, file=sys.stderr)  # to stderr, as argparse normally does
+#         emit.ended_ok()
+#     except ArgumentParsingError as err:
+#         print(err, file=sys.stderr)  # to stderr, as argparse normally does
+#         emit.ended_ok()
+#         sys.exit(1)
+#     except errors.RockcraftError as err:
+#         _emit_error(err)
+#         sys.exit(1)
+#     except PartsError as err:
+#         _emit_error(
+#             craft_cli.CraftError(
+#                 err.brief, details=err.details, resolution=err.resolution
+#             )
+#         )
+#         sys.exit(1)
+#     except ProviderError as err:
+#         _emit_error(craft_cli.CraftError(f"craft-providers error: {err}"))
+#         sys.exit(1)
+#     except Exception as err:  # pylint: disable=broad-except
+#         _emit_error(craft_cli.CraftError(f"rockcraft internal error: {err!r}"))
+#         sys.exit(1)

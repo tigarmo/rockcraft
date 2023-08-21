@@ -16,32 +16,37 @@
 
 """Rockcraft lifecycle commands."""
 
+from __future__ import annotations
+
 import abc
+import argparse
 import textwrap
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from craft_application.commands import AppCommand
+from craft_application.commands import lifecycle as base_lifecycle
 from craft_cli import BaseCommand, emit
-from overrides import overrides
+from overrides import overrides, override
 
-from rockcraft import lifecycle
 
 if TYPE_CHECKING:
-    import argparse
+    from rockcraft.application import Rockcraft
 
 
-class _LifecycleCommand(BaseCommand, abc.ABC):
+class _LifecycleCommand(AppCommand, abc.ABC):
     """Lifecycle-related commands."""
 
-    @overrides
-    def run(self, parsed_args: "argparse.Namespace") -> None:
-        """Run the command."""
-        if not self.name:
-            raise RuntimeError("command name not specified")
+    # @overrides
+    # def run(self, parsed_args: "argparse.Namespace") -> None:
+    #     """Run the command."""
+    #     if not self.name:
+    #         raise RuntimeError("command name not specified")
+    #
+    #     emit.trace(f"lifecycle command: {self.name!r}, arguments: {parsed_args!r}")
+    # TODO
+    # lifecycle.run(self.name, parsed_args)
 
-        emit.trace(f"lifecycle command: {self.name!r}, arguments: {parsed_args!r}")
-        lifecycle.run(self.name, parsed_args)
-
-    def fill_parser(self, parser: "argparse.ArgumentParser") -> None:
+    def fill_parser(self, parser: argparse.ArgumentParser) -> None:
         super().fill_parser(parser)  # type: ignore
         parser.add_argument(
             "--debug",
@@ -59,7 +64,7 @@ class _LifecycleStepCommand(_LifecycleCommand):
     """Lifecycle step commands."""
 
     @overrides
-    def fill_parser(self, parser: "argparse.ArgumentParser") -> None:
+    def fill_parser(self, parser: argparse.ArgumentParser) -> None:
         super().fill_parser(parser)  # type: ignore
         parser.add_argument(
             "parts",
@@ -80,6 +85,17 @@ class _LifecycleStepCommand(_LifecycleCommand):
             action="store_true",
             help="Shell into the environment after the step has run.",
         )
+
+    @override
+    def run(
+        self, parsed_args: argparse.Namespace, step_name: str | None = None
+    ) -> None:
+        """Run a lifecycle step command."""
+        super().run(parsed_args)
+
+        step_name = step_name or self.name
+
+        self._services.lifecycle.run(step_name=step_name, part_names=parsed_args.parts)
 
 
 class CleanCommand(_LifecycleStepCommand):
@@ -163,8 +179,12 @@ class PrimeCommand(_LifecycleStepCommand):
     )
 
 
-class PackCommand(_LifecycleCommand):
+class PackCommand(base_lifecycle.PackCommand):
     """Command to pack the final artifact."""
+
+    def __init__(self, config: dict[str, Any]) -> None:
+        super().__init__(config)
+        self._application: Rockcraft = config["application"]
 
     name = "pack"
     help_msg = "Create the ROCK"
@@ -174,3 +194,26 @@ class PackCommand(_LifecycleCommand):
         the project payload with the provided metadata.
         """
     )
+
+    @override
+    def run(
+        self, parsed_args: argparse.Namespace, step_name: str | None = None
+    ) -> None:
+        """Run the pack command."""
+        if step_name not in ("pack", None):
+            raise RuntimeError(f"Step name {step_name} passed to pack command.")
+
+        self._application.run_command("pack", parsed_args)
+
+    def fill_parser(self, parser: argparse.ArgumentParser) -> None:
+        super().fill_parser(parser)  # type: ignore
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="Shell into the environment if the build fails",
+        )
+        parser.add_argument(
+            "--destructive-mode",
+            action="store_true",
+            help="Build in the current host",
+        )

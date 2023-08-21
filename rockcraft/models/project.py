@@ -17,8 +17,10 @@
 """Project definition and helpers."""
 
 import operator
+import pathlib
 import platform as host_platform
 import re
+from builtins import super
 from functools import reduce
 from pathlib import Path
 from typing import (
@@ -38,7 +40,12 @@ from typing import (
 import pydantic
 import spdx_lookup  # type: ignore
 import yaml
+from craft_application import errors
+from craft_application.models import Project as BaseProject
+from craft_application.util import safe_yaml_load
 from craft_archives import repo
+from craft_providers import bases
+from overrides import override
 from pydantic_yaml import YamlModel
 
 from rockcraft.errors import ProjectLoadError, ProjectValidationError
@@ -179,15 +186,15 @@ class NameStr(pydantic.ConstrainedStr):
     regex = re.compile(NAME_REGEX)
 
 
-class Project(YamlModel):
+class Project(BaseProject):
     """Rockcraft project definition."""
 
-    name: NameStr
-    title: Optional[str]
-    summary: str
+    # name: NameStr
+    # title: Optional[str]
+    # summary: str
     description: str
     rock_license: str = pydantic.Field(alias="license")
-    version: str
+    # version: str
     platforms: Dict[str, Any]
     base: Literal["bare", "ubuntu:18.04", "ubuntu:20.04", "ubuntu:22.04"]
     build_base: Optional[Literal["ubuntu:18.04", "ubuntu:20.04", "ubuntu:22.04"]]
@@ -211,6 +218,13 @@ class Project(YamlModel):
         error_msg_templates = {
             "value_error.str.regex": INVALID_NAME_MESSAGE,
         }
+
+    @property
+    def effective_base(self) -> bases.BaseName:
+        """Base name for craft-providers."""
+        base = super().effective_base
+        name, channel = base.split(":")
+        return bases.BaseName(name, channel)
 
     @pydantic.root_validator(pre=True)
     @classmethod
@@ -452,28 +466,41 @@ class Project(YamlModel):
             width=1000,
         )
 
+    # @classmethod
+    # def unmarshal(cls, data: Dict[str, Any]) -> "Project":
+    #     """Create and populate a new ``Project`` object from dictionary data.
+    #
+    #     The unmarshal method validates entries in the input dictionary, populating
+    #     the corresponding fields in the data object.
+    #
+    #     :param data: The dictionary data to unmarshal.
+    #
+    #     :return: The newly created object.
+    #
+    #     :raise TypeError: If data is not a dictionary.
+    #     """
+    #     if not isinstance(data, dict):
+    #         raise TypeError("project data is not a dictionary")
+    #
+    #     try:
+    #         project = Project(**data)
+    #     except pydantic.ValidationError as err:
+    #         raise ProjectValidationError(_format_pydantic_errors(err.errors())) from err
+    #
+    #     return project
     @classmethod
-    def unmarshal(cls, data: Dict[str, Any]) -> "Project":
-        """Create and populate a new ``Project`` object from dictionary data.
-
-        The unmarshal method validates entries in the input dictionary, populating
-        the corresponding fields in the data object.
-
-        :param data: The dictionary data to unmarshal.
-
-        :return: The newly created object.
-
-        :raise TypeError: If data is not a dictionary.
-        """
-        if not isinstance(data, dict):
-            raise TypeError("project data is not a dictionary")
-
+    @override
+    def from_yaml_file(cls, path: pathlib.Path) -> "Project":
+        """Instantiate this model from a YAML file."""
+        with path.open() as file:
+            data = safe_yaml_load(file)
         try:
-            project = Project(**data)
+            # TODO apply extensions here
+            return cls.unmarshal(data)
         except pydantic.ValidationError as err:
-            raise ProjectValidationError(_format_pydantic_errors(err.errors())) from err
-
-        return project
+            raise errors.CraftValidationError.from_pydantic(
+                err, file_name=path.name
+            ) from None
 
     def generate_metadata(
         self, generation_time: str, base_digest: bytes

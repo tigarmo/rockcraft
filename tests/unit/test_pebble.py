@@ -23,7 +23,7 @@ import yaml
 
 import tests
 from rockcraft.pebble import Check, ExecCheck, HttpCheck, Pebble, Service, TcpCheck
-from rockcraft.project import ProjectValidationError
+from rockcraft.models.project import ProjectValidationError
 
 
 @tests.linux_only
